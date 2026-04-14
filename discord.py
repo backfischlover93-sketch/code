@@ -1,8 +1,7 @@
 import discord
 from discord.ext import commands, tasks
-from datetime import datetime, timedelta
-
 import os
+
 TOKEN = os.getenv("TOKEN")
 
 intents = discord.Intents.default()
