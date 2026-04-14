@@ -27,16 +27,30 @@ async def on_ready():
 # 📢 SOFORT AN ALLE DM
 @bot.command()
 async def announce(ctx, *, message):
+    role = ctx.guild.get_role(1490395401365356556)  # <-- HIER deine Role ID einfügen
+
+    if role not in ctx.author.roles:
+        await ctx.send("❌ Du hast keine Berechtigung für diesen Command!")
+        return
+
     await ctx.send("📨 Sende Nachricht an alle...")
 
     for member in ctx.guild.members:
         if not member.bot:
             try:
-                await member.send(
-    embed=discord.Embed(
-        title="📢 ANKÜNDIGUNG 📢",
-        description=message,
-        color=discord.Color.blue()
+                embed = discord.Embed(
+                    title="📢 ANKÜNDIGUNG 📢",
+                    description=message,
+                    color=discord.Color.blue()
+                )
+
+                await member.send(embed=embed)
+
+            except:
+                pass
+
+    await ctx.send("✅ Fertig!")
+
     )
 )
             except:
