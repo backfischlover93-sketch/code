@@ -1,8 +1,13 @@
 import discord
 from discord.ext import commands, tasks
 import os
+from datetime import datetime, timedelta
 
 TOKEN = os.getenv("TOKEN")
+
+if TOKEN is None:
+    print("❌ TOKEN fehlt! Setze ihn in Railway Variables!")
+    exit()
 
 intents = discord.Intents.default()
 intents.members = True
@@ -10,7 +15,6 @@ intents.message_content = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-# gespeicherte geplante Nachrichten
 scheduled = []
 
 @bot.event
@@ -24,10 +28,9 @@ async def on_ready():
     check_schedule.start()
 
 
-# 📢 SOFORT AN ALLE DM
 @bot.command()
 async def announce(ctx, *, message):
-    role = ctx.guild.get_role(1490395401365356556)  # <-- HIER deine Role ID einfügen
+    role = ctx.guild.get_role(1490395401365356556)
 
     if role not in ctx.author.roles:
         await ctx.send("❌ Du hast keine Berechtigung für diesen Command!")
@@ -52,7 +55,6 @@ async def announce(ctx, *, message):
     await ctx.send("✅ Fertig!")
 
 
-# ⏳ GEPLANT NACH X TAGEN
 @bot.command()
 async def schedule(ctx, days: int, *, message):
     time = datetime.now() + timedelta(days=days)
@@ -66,7 +68,6 @@ async def schedule(ctx, days: int, *, message):
     await ctx.send(f"⏳ Geplant in {days} Tagen!")
 
 
-# 🔁 CHECKER
 @tasks.loop(minutes=1)
 async def check_schedule():
     now = datetime.now()
