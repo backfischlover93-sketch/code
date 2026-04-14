@@ -51,9 +51,7 @@ async def announce(ctx, *, message):
 
     await ctx.send("✅ Fertig!")
 
-    )
-)
-            except:
+        except:
                 pass
 
     await ctx.send("✅ Fertig!")
