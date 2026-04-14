@@ -51,11 +51,6 @@ async def announce(ctx, *, message):
 
     await ctx.send("✅ Fertig!")
 
-        except:
-                pass
-
-    await ctx.send("✅ Fertig!")
-
 
 # ⏳ GEPLANT NACH X TAGEN
 @bot.command()
