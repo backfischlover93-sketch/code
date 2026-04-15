@@ -159,7 +159,8 @@ async def before_check_schedule():
 
 
 # ===== CHECK SCHEDULE =====
-# ===== CHECK SCHEDULE =====
+scheduled = []
+
 @tasks.loop(minutes=1)
 async def check_schedule():
     now = datetime.now()
@@ -181,10 +182,13 @@ async def check_schedule():
             scheduled.remove(item)
 
 
-# WICHTIG: MUSS NACH DER FUNKTION STEHEN
-@check_schedule.before_loop
-async def before_check_schedule():
-    await bot.wait_until_ready()
+@bot.event
+async def on_ready():
+    print(f"Bot online als {bot.user}")
+    await bot.change_presence(activity=discord.Game(name="🔵⚪ Ruhrstadt 👊"))
+
+    # 👉 WICHTIG: erst hier starten!
+    check_schedule.start()
 
 
 # ===== START =====
