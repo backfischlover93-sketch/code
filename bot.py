@@ -7,13 +7,13 @@ import asyncio
 TOKEN = os.getenv("TOKEN")
 
 if TOKEN is None:
-    print("❌ TOKEN fehlt! Setze ihn in Railway Variables!")
+    print("❌ TOKEN fehlt!")
     exit()
 
 intents = discord.Intents.default()
 intents.members = True
 intents.message_content = True
-intents.reactions = True  # 🔥 WICHTIG FIX
+intents.reactions = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
@@ -34,7 +34,6 @@ STRIKE_3 = 1493967152984625305
 # ===== ACTIVITY STATE =====
 activity_running = False
 activity_message_id = None
-activity_users = set()
 activity_number = 4
 
 
@@ -42,10 +41,7 @@ activity_number = 4
 @bot.event
 async def on_ready():
     print(f"Bot online als {bot.user}")
-
-    await bot.change_presence(
-        activity=discord.Game(name="🔵⚪ Ruhrstadt 👊")
-    )
+    await bot.change_presence(activity=discord.Game(name="🔵⚪ Ruhrstadt 👊"))
 
 
 # ===== ANNOUNCE =====
@@ -54,54 +50,36 @@ async def announce(ctx, *, message):
     role = ctx.guild.get_role(ANNOUNCE_ROLE)
 
     if role not in ctx.author.roles:
-        await ctx.send("❌ Du hast keine Berechtigung!")
-        return
+        return await ctx.send("❌ Keine Berechtigung!")
 
-    await ctx.send("📨 Sende Nachricht an alle...")
+    await ctx.send("📨 Sende...")
 
-    for member in ctx.guild.members:
-        if not member.bot:
+    for m in ctx.guild.members:
+        if not m.bot:
             try:
-                embed = discord.Embed(
-                    title="📢 ANKÜNDIGUNG 📢",
+                await m.send(embed=discord.Embed(
+                    title="📢 ANKÜNDIGUNG",
                     description=message,
                     color=discord.Color.blue()
-                )
-                await member.send(embed=embed)
+                ))
             except:
                 pass
 
     await ctx.send("✅ Fertig!")
 
 
-# ===== SCHEDULE =====
-@bot.command()
-async def schedule(ctx, days: int, *, message):
-    time = datetime.now() + timedelta(days=days)
-
-    scheduled.append({
-        "time": time,
-        "guild": ctx.guild.id,
-        "message": message
-    })
-
-    await ctx.send(f"⏳ Geplant in {days} Tagen!")
-
-
 # ===== ACTIVITY START =====
 @bot.command()
 async def activity(ctx, days: int):
-    global activity_running, activity_message_id, activity_users, activity_number
+    global activity_running, activity_message_id, activity_number
 
     role = ctx.guild.get_role(ACTIVITY_ROLE_ID)
 
     if role not in ctx.author.roles:
-        await ctx.send("❌ Keine Berechtigung!")
-        return
+        return await ctx.send("❌ Keine Berechtigung!")
 
     if activity_running:
-        await ctx.send("❌ Es läuft bereits ein Activity Check!")
-        return
+        return await ctx.send("❌ Läuft schon!")
 
     channel = bot.get_channel(ACTIVITY_CHANNEL_ID)
 
@@ -111,60 +89,40 @@ async def activity(ctx, days: int):
 
     await msg.add_reaction("✅")
 
-    activity_running = True
     activity_message_id = msg.id
-    activity_users = set()
+    activity_running = True
 
-    await ctx.send("✅ Activity gestartet!")
+    await ctx.send("✅ gestartet")
 
     await asyncio.sleep(days * 86400)
-
     await finish_activity(ctx.guild)
-
-
-# ===== LIVE REACTION TRACKING (FIX) =====
-@bot.event
-async def on_reaction_add(reaction, user):
-    global activity_users, activity_message_id
-
-    if user.bot:
-        return
-
-    if activity_message_id is None:
-        return
-
-    if reaction.message.id != activity_message_id:
-        return
-
-    if str(reaction.emoji) == "✅":
-        activity_users.add(user.id)
 
 
 # ===== END COMMAND =====
 @bot.command()
 async def end(ctx):
     if not activity_running:
-        await ctx.send("❌ Kein Activity Check aktiv!")
-        return
+        return await ctx.send("❌ Kein Activity Check")
 
     await finish_activity(ctx.guild)
-    await ctx.send("🛑 Activity Check beendet!")
+    await ctx.send("🛑 beendet")
 
 
 # ===== FINISH LOGIC =====
 async def finish_activity(guild):
-    global activity_running, activity_message_id, activity_users, activity_number
+    global activity_running, activity_message_id, activity_number
 
     channel = bot.get_channel(ACTIVITY_CHANNEL_ID)
     strike_channel = bot.get_channel(STRIKE_CHANNEL_ID)
 
-    if not channel:
-        return
+    msg = await channel.fetch_message(activity_message_id)
 
-    try:
-        msg = await channel.fetch_message(activity_message_id)
-    except:
-        return
+    reacted_ids = set()
+
+    for reaction in msg.reactions:
+        if str(reaction.emoji) == "✅":
+            async for user in reaction.users():
+                reacted_ids.add(user.id)
 
     role = guild.get_role(ACTIVITY_ROLE_ID)
 
@@ -175,46 +133,45 @@ async def finish_activity(guild):
         if role not in member.roles:
             continue
 
-        # ❌ NICHT reagiert
-        if member.id not in activity_users:
+        if member.id in reacted_ids:
+            continue
 
-            try:
-                if guild.get_role(STRIKE_1) in member.roles:
-                    await member.remove_roles(guild.get_role(STRIKE_1))
-                    await member.add_roles(guild.get_role(STRIKE_2))
+        # STRIKE SYSTEM
+        try:
+            if guild.get_role(STRIKE_1) in member.roles:
+                await member.remove_roles(guild.get_role(STRIKE_1))
+                await member.add_roles(guild.get_role(STRIKE_2))
 
-                    await strike_channel.send(
-                        f"**· Strike 2**\n**Warum?**: Reactet nicht im Activity Check\n| {member.mention} |"
-                    )
+                await strike_channel.send(
+                    f"**· Strike 2**\nWarum: Activity Check\n{member.mention}"
+                )
 
-                elif guild.get_role(STRIKE_2) in member.roles:
-                    await member.remove_roles(guild.get_role(STRIKE_2))
-                    await member.add_roles(guild.get_role(STRIKE_3))
+            elif guild.get_role(STRIKE_2) in member.roles:
+                await member.remove_roles(guild.get_role(STRIKE_2))
+                await member.add_roles(guild.get_role(STRIKE_3))
 
-                    await strike_channel.send(
-                        f"**· Strike 3**\n**Warum?**: Reactet nicht im Activity Check\n| {member.mention} |"
-                    )
+                await strike_channel.send(
+                    f"**· Strike 3**\nWarum: Activity Check\n{member.mention}"
+                )
 
-                else:
-                    await member.add_roles(guild.get_role(STRIKE_1))
+            else:
+                await member.add_roles(guild.get_role(STRIKE_1))
 
-                    await strike_channel.send(
-                        f"**· Strike 1**\n**Warum?**: Reactet nicht im Activity Check\n| {member.mention} |"
-                    )
+                await strike_channel.send(
+                    f"**· Strike 1**\nWarum: Activity Check\n{member.mention}"
+                )
 
-            except Exception as e:
-                print("Error:", e)
+        except:
+            pass
 
-    await channel.send("✅ Activity Check beendet!")
+    await channel.send(f"✅ Activity Check #{activity_number} beendet!")
 
-    # reset
+    activity_number += 1
     activity_running = False
     activity_message_id = None
-    activity_users = set()
-    activity_number += 1
 
 
-# ===== SCHEDULE LOOP =====
+# ===== SCHEDULE =====
 @tasks.loop(minutes=1)
 async def check_schedule():
     now = datetime.now()
@@ -224,17 +181,14 @@ async def check_schedule():
             guild = bot.get_guild(item["guild"])
 
             if guild:
-                for member in guild.members:
-                    if not member.bot:
+                for m in guild.members:
+                    if not m.bot:
                         try:
-                            await member.send(
-                                f"📢 GEPLANTE ANKÜNDIGUNG:\n{item['message']}"
-                            )
+                            await m.send(item["message"])
                         except:
                             pass
 
             scheduled.remove(item)
 
 
-# ===== START =====
 bot.run(TOKEN)
