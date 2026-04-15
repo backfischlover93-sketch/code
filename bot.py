@@ -13,6 +13,7 @@ if TOKEN is None:
 intents = discord.Intents.default()
 intents.members = True
 intents.message_content = True
+intents.reactions = True  # 🔥 WICHTIG FIX
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
@@ -33,14 +34,13 @@ STRIKE_3 = 1493967152984625305
 # ===== ACTIVITY STATE =====
 activity_running = False
 activity_message_id = None
-activity_reacted = set()
+activity_users = set()
 activity_number = 4
 
 
 # ===== READY =====
 @bot.event
 async def on_ready():
-    global activity_number
     print(f"Bot online als {bot.user}")
 
     await bot.change_presence(
@@ -91,7 +91,7 @@ async def schedule(ctx, days: int, *, message):
 # ===== ACTIVITY START =====
 @bot.command()
 async def activity(ctx, days: int):
-    global activity_running, activity_message_id, activity_reacted, activity_number
+    global activity_running, activity_message_id, activity_users, activity_number
 
     role = ctx.guild.get_role(ACTIVITY_ROLE_ID)
 
@@ -106,24 +106,41 @@ async def activity(ctx, days: int):
     channel = bot.get_channel(ACTIVITY_CHANNEL_ID)
 
     msg = await channel.send(
-        f"**ACTIVITY CHECK**\n| {activity_number} |\nWer nicht Reactet bekommt Strike"
+        f"**ACTIVITY CHECK**\n| {activity_number} |\nWer nicht reagiert bekommt Strike"
     )
 
     await msg.add_reaction("✅")
 
     activity_running = True
     activity_message_id = msg.id
-    activity_reacted = set()
+    activity_users = set()
 
-    await ctx.send("✅ Activity Check gestartet!")
+    await ctx.send("✅ Activity gestartet!")
 
-    # Timer läuft im Hintergrund
     await asyncio.sleep(days * 86400)
 
     await finish_activity(ctx.guild)
 
 
-# ===== ACTIVITY END COMMAND =====
+# ===== LIVE REACTION TRACKING (FIX) =====
+@bot.event
+async def on_reaction_add(reaction, user):
+    global activity_users, activity_message_id
+
+    if user.bot:
+        return
+
+    if activity_message_id is None:
+        return
+
+    if reaction.message.id != activity_message_id:
+        return
+
+    if str(reaction.emoji) == "✅":
+        activity_users.add(user.id)
+
+
+# ===== END COMMAND =====
 @bot.command()
 async def end(ctx):
     if not activity_running:
@@ -131,33 +148,23 @@ async def end(ctx):
         return
 
     await finish_activity(ctx.guild)
-    await ctx.send("🛑 Activity Check wurde beendet!")
+    await ctx.send("🛑 Activity Check beendet!")
 
 
-# ===== ACTIVITY FINISH LOGIC =====
+# ===== FINISH LOGIC =====
 async def finish_activity(guild):
-    global activity_running, activity_message_id, activity_number
+    global activity_running, activity_message_id, activity_users, activity_number
 
     channel = bot.get_channel(ACTIVITY_CHANNEL_ID)
     strike_channel = bot.get_channel(STRIKE_CHANNEL_ID)
 
-    if channel is None:
-        print("❌ Activity Channel nicht gefunden")
+    if not channel:
         return
 
     try:
         msg = await channel.fetch_message(activity_message_id)
-    except Exception as e:
-        print("❌ Message konnte nicht geladen werden:", e)
+    except:
         return
-
-    # ✅ USERS SAUBER SAMMELN
-    reacted_users = set()
-
-    for reaction in msg.reactions:
-        if reaction.emoji == "✅":
-            async for user in reaction.users():
-                reacted_users.add(user.id)
 
     role = guild.get_role(ACTIVITY_ROLE_ID)
 
@@ -169,7 +176,8 @@ async def finish_activity(guild):
             continue
 
         # ❌ NICHT reagiert
-        if member.id not in reacted_users:
+        if member.id not in activity_users:
+
             try:
                 if guild.get_role(STRIKE_1) in member.roles:
                     await member.remove_roles(guild.get_role(STRIKE_1))
@@ -195,21 +203,18 @@ async def finish_activity(guild):
                     )
 
             except Exception as e:
-                print("❌ Fehler bei Member:", member, e)
+                print("Error:", e)
 
     await channel.send("✅ Activity Check beendet!")
 
+    # reset
     activity_running = False
     activity_message_id = None
-
-    # Reset + Nummer hochzählen
-    activity_running = False
-    activity_message_id = None
-    activity_reacted = set()
+    activity_users = set()
     activity_number += 1
 
 
-# ===== CHECK SCHEDULE =====
+# ===== SCHEDULE LOOP =====
 @tasks.loop(minutes=1)
 async def check_schedule():
     now = datetime.now()
