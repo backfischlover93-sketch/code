@@ -179,6 +179,10 @@ async def check_schedule():
 
             scheduled.remove(item)
 
+@check_schedule.before_loop
+async def before_check_schedule():
+    await bot.wait_until_ready()
+
 
 # ===== START =====
 bot.run(TOKEN)
