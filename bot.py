@@ -81,6 +81,11 @@ async def announce(ctx, *, message):
 async def activity(ctx, days: int):
     global activity_running, activity_message_id, activity_number
 
+    role = ctx.guild.get_role(1493967153261580312)
+
+    if role not in ctx.author.roles:
+        return await ctx.send("❌ Keine Berechtigung für Activity Command!")
+
     if activity_running:
         return await ctx.send("❌ Activity läuft bereits!")
 
@@ -101,11 +106,15 @@ async def activity(ctx, days: int):
 
     await finish_activity(ctx.guild)
 
-
 # ================= MANUAL END =================
 @bot.command()
 async def end(ctx):
     global activity_running
+
+    role = ctx.guild.get_role(1493967153261580312)
+
+    if role not in ctx.author.roles:
+        return await ctx.send("❌ Keine Berechtigung für diesen Command!")
 
     if not activity_running:
         return await ctx.send("❌ Kein Activity Check aktiv!")
