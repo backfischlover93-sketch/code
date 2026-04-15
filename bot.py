@@ -1,14 +1,9 @@
 import discord
-from discord.ext import commands, tasks
+from discord.ext import commands
 import os
-from datetime import datetime, timedelta
 import asyncio
 
 TOKEN = os.getenv("TOKEN")
-
-if not TOKEN:
-    print("❌ TOKEN fehlt!")
-    exit()
 
 intents = discord.Intents.default()
 intents.members = True
@@ -18,76 +13,80 @@ intents.reactions = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 # ================= IDS =================
-ANNOUNCE_ROLE = 1490395401365356556
+ACTIVITY_ADMIN_ROLE = 1493967153261580312
 
-ACTIVITY_CHANNEL_ID = 1490395401935655043
-STRIKE_CHANNEL_ID = 1490395402304749810
+ACTIVITY_CHANNEL_ID = 1493967155430031413
+STRIKE_CHANNEL_ID = 1493967156012908673
 
-STRIKE_1 = 1490395401336000558
-STRIKE_2 = 1490395401336000557
-STRIKE_3 = 1490395401336000555
+STRIKE_1 = 1493967152984625308
+STRIKE_2 = 1493967152984625307
+STRIKE_3 = 1493967152984625305
 
 EXEMPT_ROLES = {
-    1490395401365356556,
-    1490395401365356555,
-    1490395401365356554,
-    1490395401348710489,
-    1491520735477235832,
+    1493967153261580312,
+    1493967153261580311,
+    1493967153261580310,
+    1493967153261580308,
+    1493967152984625304,
 }
 
 # ================= STATE =================
-scheduled = []
-
 activity_running = False
 activity_message_id = None
 activity_number = 4
 
+activity_reacted = set()
+first_reactor = None
+
+# rollback storage für !delete
+backup_before_strikes = {}
 
 # ================= READY =================
 @bot.event
 async def on_ready():
     print(f"Bot online als {bot.user}")
-    await bot.change_presence(activity=discord.Game(name="🔵⚪ Ruhrstadt 👊"))
 
 
-# ================= ANNOUNCE =================
-@bot.command()
-async def announce(ctx, *, message):
-    role = ctx.guild.get_role(ANNOUNCE_ROLE)
+# ================= FIRST REACTION =================
+@bot.event
+async def on_reaction_add(reaction, user):
+    global first_reactor
 
-    if role not in ctx.author.roles:
-        return await ctx.send("❌ Keine Berechtigung!")
+    if user.bot:
+        return
 
-    await ctx.send("📨 Sende Nachricht...")
+    if not activity_running:
+        return
 
-    for member in ctx.guild.members:
-        if not member.bot:
-            try:
-                await member.send(
-                    embed=discord.Embed(
-                        title="📢 ANKÜNDIGUNG 📢",
-                        description=message,
-                        color=discord.Color.blue()
-                    )
-                )
-            except:
-                pass
+    if reaction.message.id != activity_message_id:
+        return
 
-    await ctx.send("✅ Fertig!")
+    if str(reaction.emoji) != "✅":
+        return
+
+    if first_reactor is None:
+        first_reactor = user
+
+        channel = bot.get_channel(ACTIVITY_CHANNEL_ID)
+        if channel:
+            asyncio.create_task(
+                channel.send(f"🥇 First {user.mention}")
+            )
 
 
 # ================= ACTIVITY START =================
 @bot.command()
 async def activity(ctx, days: int):
     global activity_running, activity_message_id, activity_number
+    global activity_reacted, first_reactor, backup_before_strikes
 
-    role = ctx.guild.get_role(1490395401365356556)
+    role = ctx.guild.get_role(ACTIVITY_ADMIN_ROLE)
 
     if role not in ctx.author.roles:
-        return await ctx.send("❌ Keine Berechtigung für Activity Command!")
+        return await ctx.send("❌ Keine Berechtigung!")
 
     if activity_running:
-        return await ctx.send("❌ Activity läuft bereits!")
+        return await ctx.send("❌ Läuft bereits!")
 
     channel = bot.get_channel(ACTIVITY_CHANNEL_ID)
 
@@ -99,33 +98,82 @@ async def activity(ctx, days: int):
 
     activity_running = True
     activity_message_id = msg.id
+    activity_reacted = set()
+    first_reactor = None
+    backup_before_strikes = {}
 
     await ctx.send("✅ Activity gestartet!")
 
     await asyncio.sleep(days * 86400)
-
     await finish_activity(ctx.guild)
 
-# ================= MANUAL END =================
+
+# ================= ABBRUCH =================
 @bot.command()
-async def end(ctx):
+async def abbruch(ctx):
     global activity_running
 
-    role = ctx.guild.get_role(1490395401365356556)
+    role = ctx.guild.get_role(ACTIVITY_ADMIN_ROLE)
 
     if role not in ctx.author.roles:
-        return await ctx.send("❌ Keine Berechtigung für diesen Command!")
+        return await ctx.send("❌ Keine Berechtigung!")
 
     if not activity_running:
         return await ctx.send("❌ Kein Activity Check aktiv!")
 
-    await finish_activity(ctx.guild)
-    await ctx.send("🛑 Activity beendet!")
+    activity_running = False
+
+    await ctx.send("🛑 Activity Check abgebrochen (keine Strikes vergeben)")
 
 
-# ================= FINISH LOGIC =================
+# ================= DELETE / ROLLBACK =================
+@bot.command()
+async def delete(ctx):
+    global backup_before_strikes, activity_running
+
+    role = ctx.guild.get_role(ACTIVITY_ADMIN_ROLE)
+
+    if role not in ctx.author.roles:
+        return await ctx.send("❌ Keine Berechtigung!")
+
+    if not backup_before_strikes:
+        return await ctx.send("❌ Nichts zum Zurücksetzen!")
+
+    guild = ctx.guild
+
+    for member_id, roles in backup_before_strikes.items():
+        member = guild.get_member(member_id)
+        if not member:
+            continue
+
+        try:
+            current_roles = [r for r in member.roles if r.name != "@everyone"]
+
+            # alles Strike entfernen
+            for r in [STRIKE_1, STRIKE_2, STRIKE_3]:
+                role_obj = guild.get_role(r)
+                if role_obj in current_roles:
+                    await member.remove_roles(role_obj)
+
+            # alte Rollen wiedergeben
+            for r_id in roles:
+                role_obj = guild.get_role(r_id)
+                if role_obj:
+                    await member.add_roles(role_obj)
+
+        except:
+            pass
+
+    backup_before_strikes = {}
+    activity_running = False
+
+    await ctx.send("♻️ Activity Check komplett zurückgesetzt!")
+
+
+# ================= FINISH =================
 async def finish_activity(guild):
     global activity_running, activity_message_id, activity_number
+    global first_reactor, backup_before_strikes
 
     channel = bot.get_channel(ACTIVITY_CHANNEL_ID)
     strike_channel = bot.get_channel(STRIKE_CHANNEL_ID)
@@ -147,20 +195,21 @@ async def finish_activity(guild):
         if member.bot:
             continue
 
-        # EXEMPT ROLES → NIE STRIKE
         if any(r.id in EXEMPT_ROLES for r in member.roles):
             continue
 
-        # hat reagiert
+        # backup speichern
+        backup_before_strikes[member.id] = [r.id for r in member.roles]
+
         if member.id in reacted_ids:
             continue
 
         try:
-            roles = [r.id for r in member.roles]
-
             r1 = guild.get_role(STRIKE_1)
             r2 = guild.get_role(STRIKE_2)
             r3 = guild.get_role(STRIKE_3)
+
+            roles = [r.id for r in member.roles]
 
             if STRIKE_1 in roles:
                 await member.remove_roles(r1)
@@ -178,19 +227,17 @@ async def finish_activity(guild):
 
             await strike_channel.send(
                 f"**· Strike {level}**\n"
-                f"**Warum?**: Reactet nicht im Activity Check.\n"
+                f"**Warum?:** Reactet nicht im Activity Check.\n"
                 f"| {member.mention} |"
             )
 
         except:
             pass
 
-    await channel.send("✅ Activity Check beendet!")
-
+    # reset
     activity_running = False
     activity_message_id = None
     activity_number += 1
+    first_reactor = None
 
-
-# ================= RUN =================
-bot.run(TOKEN)
+    await channel.send("✅ Activity Check beendet!")
