@@ -18,21 +18,21 @@ intents.reactions = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 # ================= IDS =================
-ANNOUNCE_ROLE = 1493967153261580312
+ANNOUNCE_ROLE = 1490395401365356556
 
-ACTIVITY_CHANNEL_ID = 1493967155430031413
-STRIKE_CHANNEL_ID = 1493967156012908673
+ACTIVITY_CHANNEL_ID = 1490395401935655043
+STRIKE_CHANNEL_ID = 1490395402304749810
 
-STRIKE_1 = 1493967152984625308
-STRIKE_2 = 1493967152984625307
-STRIKE_3 = 1493967152984625305
+STRIKE_1 = 1490395401336000558
+STRIKE_2 = 1490395401336000557
+STRIKE_3 = 1490395401336000555
 
 EXEMPT_ROLES = {
-    1493967153261580312,
-    1493967153261580311,
-    1493967153261580310,
-    1493967153261580308,
-    1493967152984625304,
+    1490395401365356556,
+    1490395401365356555,
+    1490395401365356554,
+    1490395401348710489,
+    1491520735477235832,
 }
 
 # ================= STATE =================
@@ -81,7 +81,7 @@ async def announce(ctx, *, message):
 async def activity(ctx, days: int):
     global activity_running, activity_message_id, activity_number
 
-    role = ctx.guild.get_role(1493967153261580312)
+    role = ctx.guild.get_role(1490395401365356556)
 
     if role not in ctx.author.roles:
         return await ctx.send("❌ Keine Berechtigung für Activity Command!")
@@ -111,7 +111,7 @@ async def activity(ctx, days: int):
 async def end(ctx):
     global activity_running
 
-    role = ctx.guild.get_role(1493967153261580312)
+    role = ctx.guild.get_role(1490395401365356556)
 
     if role not in ctx.author.roles:
         return await ctx.send("❌ Keine Berechtigung für diesen Command!")
