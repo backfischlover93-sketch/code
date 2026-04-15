@@ -30,18 +30,6 @@ STRIKE_2 = 1493967152984625307
 STRIKE_3 = 1493967152984625305
 
 
-# ===== READY =====
-@bot.event
-async def on_ready():
-    print(f"Bot online als {bot.user}")
-
-    await bot.change_presence(
-        activity=discord.Game(name="🔵⚪ Ruhrstadt 👊")
-    )
-
-    check_schedule.start()
-
-
 # ===== ANNOUNCE =====
 @bot.command()
 async def announce(ctx, *, message):
@@ -68,20 +56,6 @@ async def announce(ctx, *, message):
     await ctx.send("✅ Fertig!")
 
 
-# ===== SCHEDULE =====
-@bot.command()
-async def schedule(ctx, days: int, *, message):
-    time = datetime.now() + timedelta(days=days)
-
-    scheduled.append({
-        "time": time,
-        "guild": ctx.guild.id,
-        "message": message
-    })
-
-    await ctx.send(f"⏳ Geplant in {days} Tagen!")
-
-
 # ===== ACTIVITY CHECK =====
 @bot.command()
 async def activity(ctx, days: int):
@@ -94,7 +68,7 @@ async def activity(ctx, days: int):
     channel = bot.get_channel(ACTIVITY_CHANNEL_ID)
 
     msg = await channel.send(
-        f"**ACTIVITY CHECK**\n| {days} Tage |\nWer nicht reactet bekommt Strike"
+        f"**ACTIVITY CHECK**\n| {days} Tage |\nWer nicht reagiert bekommt Strike"
     )
 
     await msg.add_reaction("✅")
@@ -152,14 +126,19 @@ async def activity(ctx, days: int):
     await channel.send("✅ Activity Check beendet!")
 
 
-# ===== FIX: CHECKER STARTET ERST WENN BOT READY IST =====
-@check_schedule.before_loop
-async def before_check_schedule():
-    await bot.wait_until_ready()
+# ===== SCHEDULE SYSTEM =====
+@bot.command()
+async def schedule(ctx, days: int, *, message):
+    time = datetime.now() + timedelta(days=days)
 
+    scheduled.append({
+        "time": time,
+        "guild": ctx.guild.id,
+        "message": message
+    })
 
-# ===== CHECK SCHEDULE =====
-scheduled = []
+    await ctx.send(f"⏳ Geplant in {days} Tagen!")
+
 
 @tasks.loop(minutes=1)
 async def check_schedule():
@@ -182,12 +161,15 @@ async def check_schedule():
             scheduled.remove(item)
 
 
+# ===== READY =====
 @bot.event
 async def on_ready():
     print(f"Bot online als {bot.user}")
-    await bot.change_presence(activity=discord.Game(name="🔵⚪ Ruhrstadt 👊"))
 
-    # 👉 WICHTIG: erst hier starten!
+    await bot.change_presence(
+        activity=discord.Game(name="🔵⚪ Ruhrstadt 👊")
+    )
+
     check_schedule.start()
 
 
