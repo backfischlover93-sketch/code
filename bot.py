@@ -136,62 +136,71 @@ async def end(ctx):
 
 # ===== ACTIVITY FINISH LOGIC =====
 async def finish_activity(guild):
-    global activity_running, activity_message_id, activity_reacted, activity_number
+    global activity_running, activity_message_id, activity_number
 
     channel = bot.get_channel(ACTIVITY_CHANNEL_ID)
     strike_channel = bot.get_channel(STRIKE_CHANNEL_ID)
 
+    if channel is None:
+        print("❌ Activity Channel nicht gefunden")
+        return
+
     try:
         msg = await channel.fetch_message(activity_message_id)
+    except Exception as e:
+        print("❌ Message konnte nicht geladen werden:", e)
+        return
 
-        reacted_users = set()
+    # ✅ USERS SAUBER SAMMELN
+    reacted_users = set()
 
-        for reaction in msg.reactions:
-            if str(reaction.emoji) == "✅":
-                users = [user async for user in reaction.users()]
-                reacted_users.update(users)
+    for reaction in msg.reactions:
+        if reaction.emoji == "✅":
+            async for user in reaction.users():
+                reacted_users.add(user.id)
 
-        role = guild.get_role(ACTIVITY_ROLE_ID)
+    role = guild.get_role(ACTIVITY_ROLE_ID)
 
-        for member in guild.members:
-            if member.bot:
-                continue
+    for member in guild.members:
+        if member.bot:
+            continue
 
-            if role not in member.roles:
-                continue
+        if role not in member.roles:
+            continue
 
-            if member not in reacted_users:
-                try:
-                    if guild.get_role(STRIKE_1) in member.roles:
-                        await member.remove_roles(guild.get_role(STRIKE_1))
-                        await member.add_roles(guild.get_role(STRIKE_2))
+        # ❌ NICHT reagiert
+        if member.id not in reacted_users:
+            try:
+                if guild.get_role(STRIKE_1) in member.roles:
+                    await member.remove_roles(guild.get_role(STRIKE_1))
+                    await member.add_roles(guild.get_role(STRIKE_2))
 
-                        await strike_channel.send(
-                            f"**· Strike 2**\n**Warum?**: Reactet nicht im Activity Check\n| {member.mention} |"
-                        )
+                    await strike_channel.send(
+                        f"**· Strike 2**\n**Warum?**: Reactet nicht im Activity Check\n| {member.mention} |"
+                    )
 
-                    elif guild.get_role(STRIKE_2) in member.roles:
-                        await member.remove_roles(guild.get_role(STRIKE_2))
-                        await member.add_roles(guild.get_role(STRIKE_3))
+                elif guild.get_role(STRIKE_2) in member.roles:
+                    await member.remove_roles(guild.get_role(STRIKE_2))
+                    await member.add_roles(guild.get_role(STRIKE_3))
 
-                        await strike_channel.send(
-                            f"**· Strike 3**\n**Warum?**: Reactet nicht im Activity Check\n| {member.mention} |"
-                        )
+                    await strike_channel.send(
+                        f"**· Strike 3**\n**Warum?**: Reactet nicht im Activity Check\n| {member.mention} |"
+                    )
 
-                    else:
-                        await member.add_roles(guild.get_role(STRIKE_1))
+                else:
+                    await member.add_roles(guild.get_role(STRIKE_1))
 
-                        await strike_channel.send(
-                            f"**· Strike 1**\n**Warum?**: Reactet nicht im Activity Check\n| {member.mention} |"
-                        )
+                    await strike_channel.send(
+                        f"**· Strike 1**\n**Warum?**: Reactet nicht im Activity Check\n| {member.mention} |"
+                    )
 
-                except:
-                    pass
+            except Exception as e:
+                print("❌ Fehler bei Member:", member, e)
 
-        await channel.send("✅ Activity Check beendet!")
+    await channel.send("✅ Activity Check beendet!")
 
-    except:
-        pass
+    activity_running = False
+    activity_message_id = None
 
     # Reset + Nummer hochzählen
     activity_running = False
