@@ -2,6 +2,7 @@ import discord
 from discord.ext import commands
 import os
 import asyncio
+import json
 
 TOKEN = os.getenv("TOKEN")
 
@@ -41,13 +42,39 @@ activity_number = 4
 first_reactor = None
 backup_before_strikes = {}
 
+STATE_FILE = "activity_state.json"
+
+
+# ================= STATE SAVE/LOAD =================
+def save_state():
+    with open(STATE_FILE, "w") as f:
+        json.dump({
+            "activity_running": activity_running,
+            "activity_message_id": activity_message_id,
+            "activity_number": activity_number
+        }, f)
+
+
+def load_state():
+    global activity_running, activity_message_id, activity_number
+    try:
+        with open(STATE_FILE, "r") as f:
+            data = json.load(f)
+            activity_running = data.get("activity_running", False)
+            activity_message_id = data.get("activity_message_id", None)
+            activity_number = data.get("activity_number", 4)
+    except:
+        pass
+
+
 # ================= READY =================
 @bot.event
 async def on_ready():
+    load_state()
     print(f"✅ Bot online als {bot.user}")
 
 
-# ================= FIRST REACTION =================
+# ================= REACTIONS =================
 @bot.event
 async def on_reaction_add(reaction, user):
     global first_reactor
@@ -78,7 +105,7 @@ async def activity(ctx, days: int):
     global activity_running, activity_message_id, activity_number
     global first_reactor, backup_before_strikes
 
-    role = ctx.guild.get_role(1490395401365356556)
+    role = ctx.guild.get_role(ACTIVITY_ADMIN_ROLE)
 
     if role not in ctx.author.roles:
         return await ctx.send("❌ Keine Berechtigung!")
@@ -99,6 +126,8 @@ async def activity(ctx, days: int):
     first_reactor = None
     backup_before_strikes = {}
 
+    save_state()
+
     await ctx.send("✅ Activity gestartet!")
 
     await asyncio.sleep(days * 86400)
@@ -110,13 +139,50 @@ async def activity(ctx, days: int):
 async def abbruch(ctx):
     global activity_running
 
-    role = ctx.guild.get_role(1490395401365356556)
+    role = ctx.guild.get_role(ACTIVITY_ADMIN_ROLE)
 
     if role not in ctx.author.roles:
         return await ctx.send("❌ Keine Berechtigung!")
 
     activity_running = False
+    save_state()
+
     await ctx.send("🛑 Activity abgebrochen")
+
+
+# ================= END COMMAND =================
+@bot.command()
+async def end(ctx, message_id: int = None):
+    global activity_message_id, activity_running
+
+    role = ctx.guild.get_role(ACTIVITY_ADMIN_ROLE)
+
+    if role not in ctx.author.roles:
+        return await ctx.send("❌ Keine Berechtigung!")
+
+    if message_id:
+        activity_message_id = message_id
+
+    if not activity_message_id:
+        return await ctx.send("❌ Keine Activity Message ID bekannt!")
+
+    channel = bot.get_channel(ACTIVITY_CHANNEL_ID)
+
+    try:
+        await channel.fetch_message(activity_message_id)
+    except:
+        return await ctx.send("❌ Message nicht gefunden!")
+
+    await ctx.send("⏳ Activity wird beendet...")
+
+    await finish_activity(ctx.guild)
+
+    activity_running = False
+    activity_message_id = None
+
+    save_state()
+
+    await ctx.send("✅ Activity beendet + Strikes vergeben!")
 
 
 # ================= FINISH =================
@@ -185,12 +251,15 @@ async def finish_activity(guild):
     activity_number += 1
     first_reactor = None
 
+    save_state()
+
     await channel.send("✅ Activity Check beendet!")
+
 
 # ================= ANNOUNCE =================
 @bot.command()
 async def announce(ctx, *, message):
-    role = ctx.guild.get_role(1490395401365356556)
+    role = ctx.guild.get_role(ACTIVITY_ADMIN_ROLE)
 
     if role not in ctx.author.roles:
         return await ctx.send("❌ Keine Berechtigung!")
