@@ -187,5 +187,25 @@ async def finish_activity(guild):
 
     await channel.send("✅ Activity Check beendet!")
 
+# ================= ANNOUNCE =================
+@bot.command()
+async def announce(ctx, *, message):
+    role = ctx.guild.get_role(1490395401365356556)
+
+    if role not in ctx.author.roles:
+        return await ctx.send("❌ Keine Berechtigung!")
+
+    await ctx.message.delete()
+
+    embed = discord.Embed(
+        title="📢Annkündigung📢",
+        description=message,
+        color=discord.Color.blue()
+    )
+
+    embed.set_footer(text=f"Von {ctx.author}", icon_url=ctx.author.avatar.url)
+
+    await ctx.send(embed=embed)
+
 
 bot.run(TOKEN)
