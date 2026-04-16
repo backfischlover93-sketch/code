@@ -1,8 +1,9 @@
 import discord
-from discord.ext import commands
+from discord.ext import commands, tasks
 import os
 import asyncio
 import json
+from datetime import datetime, timedelta
 
 TOKEN = os.getenv("TOKEN")
 
@@ -42,10 +43,11 @@ activity_number = 4
 first_reactor = None
 backup_before_strikes = {}
 
+scheduled = []
 STATE_FILE = "activity_state.json"
 
 
-# ================= STATE SAVE/LOAD =================
+# ================= SAVE / LOAD =================
 def save_state():
     with open(STATE_FILE, "w") as f:
         json.dump({
@@ -74,7 +76,7 @@ async def on_ready():
     print(f"✅ Bot online als {bot.user}")
 
 
-# ================= REACTIONS =================
+# ================= REACTION =================
 @bot.event
 async def on_reaction_add(reaction, user):
     global first_reactor
@@ -99,7 +101,7 @@ async def on_reaction_add(reaction, user):
             await channel.send(f"🥇 First {user.mention}")
 
 
-# ================= ACTIVITY START =================
+# ================= ACTIVITY =================
 @bot.command()
 async def activity(ctx, days: int):
     global activity_running, activity_message_id, activity_number
@@ -150,7 +152,7 @@ async def abbruch(ctx):
     await ctx.send("🛑 Activity abgebrochen")
 
 
-# ================= END COMMAND =================
+# ================= END =================
 @bot.command()
 async def end(ctx, message_id: int = None):
     global activity_message_id, activity_running
@@ -164,7 +166,7 @@ async def end(ctx, message_id: int = None):
         activity_message_id = message_id
 
     if not activity_message_id:
-        return await ctx.send("❌ Keine Activity Message ID bekannt!")
+        return await ctx.send("❌ Keine Message ID!")
 
     channel = bot.get_channel(ACTIVITY_CHANNEL_ID)
 
@@ -173,7 +175,7 @@ async def end(ctx, message_id: int = None):
     except:
         return await ctx.send("❌ Message nicht gefunden!")
 
-    await ctx.send("⏳ Activity wird beendet...")
+    await ctx.send("⏳ Beende Activity...")
 
     await finish_activity(ctx.guild)
 
@@ -182,7 +184,7 @@ async def end(ctx, message_id: int = None):
 
     save_state()
 
-    await ctx.send("✅ Activity beendet + Strikes vergeben!")
+    await ctx.send("✅ Fertig!")
 
 
 # ================= FINISH =================
@@ -259,33 +261,33 @@ async def finish_activity(guild):
 # ================= ANNOUNCE =================
 @bot.command()
 async def announce(ctx, *, message):
-    role = ctx.guild.get_role(1490395401365356556)
+    role = ctx.guild.get_role(ACTIVITY_ADMIN_ROLE)
 
     if role not in ctx.author.roles:
-        await ctx.send("❌ Du hast keine Berechtigung für diesen Command!")
-        return
+        return await ctx.send("❌ Keine Berechtigung!")
 
-    await ctx.send("📨 Sende Nachricht an alle...")
+    await ctx.send("📢 Sende...")
 
     for member in ctx.guild.members:
         if not member.bot:
             try:
                 embed = discord.Embed(
-                    title="📢 ANKÜNDIGUNG 📢",
+                    title="📢 ANKÜNDIGUNG",
                     description=message,
                     color=discord.Color.blue()
                 )
-
                 await member.send(embed=embed)
-
             except:
                 pass
 
     await ctx.send("✅ Fertig!")
 
-# ⏳ SCHEDULE
+
+# ================= SCHEDULE =================
 @bot.command()
 async def schedule(ctx, days: int, *, message):
+    global scheduled
+
     time = datetime.now() + timedelta(days=days)
 
     scheduled.append({
@@ -296,7 +298,8 @@ async def schedule(ctx, days: int, *, message):
 
     await ctx.send(f"⏳ Geplant in {days} Tagen!")
 
-# 🔁 CHECKER
+
+# ================= LOOP =================
 @tasks.loop(minutes=1)
 async def check_schedule():
     now = datetime.now()
@@ -316,5 +319,8 @@ async def check_schedule():
                             pass
 
             scheduled.remove(item)
+
+
+check_schedule.start()
 
 bot.run(TOKEN)
