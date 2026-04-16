@@ -69,11 +69,37 @@ def load_state():
         pass
 
 
+# ================= LOOP =================
+@tasks.loop(minutes=1)
+async def check_schedule():
+    now = datetime.now()
+
+    for item in scheduled[:]:
+        if now >= item["time"]:
+            guild = bot.get_guild(item["guild"])
+
+            if guild:
+                for member in guild.members:
+                    if not member.bot:
+                        try:
+                            await member.send(
+                                f"📢 GEPLANTE ANKÜNDIGUNG:\n{item['message']}"
+                            )
+                        except:
+                            pass
+
+            scheduled.remove(item)
+
+
 # ================= READY =================
 @bot.event
 async def on_ready():
     load_state()
     print(f"✅ Bot online als {bot.user}")
+
+    # FIX: TASK START HIER
+    if not check_schedule.is_running():
+        check_schedule.start()
 
 
 # ================= REACTION =================
@@ -95,7 +121,7 @@ async def on_reaction_add(reaction, user):
 
     if first_reactor is None:
         first_reactor = user
-        channel = bot.get_channel(ACTIVITY_CHANNEL_ID)
+        channel = bot.get_channel(1490395401935655043)
 
         if channel:
             await channel.send(f"🥇 First {user.mention}")
@@ -107,7 +133,7 @@ async def activity(ctx, days: int):
     global activity_running, activity_message_id, activity_number
     global first_reactor, backup_before_strikes
 
-    role = ctx.guild.get_role(ACTIVITY_ADMIN_ROLE)
+    role = ctx.guild.get_role(1490395401365356556)
 
     if role not in ctx.author.roles:
         return await ctx.send("❌ Keine Berechtigung!")
@@ -115,7 +141,7 @@ async def activity(ctx, days: int):
     if activity_running:
         return await ctx.send("❌ Läuft bereits!")
 
-    channel = bot.get_channel(ACTIVITY_CHANNEL_ID)
+    channel = bot.get_channel(1490395401935655043)
 
     msg = await channel.send(
         f"**ACTIVITY CHECK**\n\n| {activity_number} |\nWer nicht Reactet Strike\n||@everyone||"
@@ -141,7 +167,7 @@ async def activity(ctx, days: int):
 async def abbruch(ctx):
     global activity_running
 
-    role = ctx.guild.get_role(ACTIVITY_ADMIN_ROLE)
+    role = ctx.guild.get_role(1490395401365356556)
 
     if role not in ctx.author.roles:
         return await ctx.send("❌ Keine Berechtigung!")
@@ -157,7 +183,7 @@ async def abbruch(ctx):
 async def end(ctx, message_id: int = None):
     global activity_message_id, activity_running
 
-    role = ctx.guild.get_role(ACTIVITY_ADMIN_ROLE)
+    role = ctx.guild.get_role(1490395401365356556)
 
     if role not in ctx.author.roles:
         return await ctx.send("❌ Keine Berechtigung!")
@@ -168,7 +194,7 @@ async def end(ctx, message_id: int = None):
     if not activity_message_id:
         return await ctx.send("❌ Keine Message ID!")
 
-    channel = bot.get_channel(ACTIVITY_CHANNEL_ID)
+    channel = bot.get_channel(1490395401935655043)
 
     try:
         await channel.fetch_message(activity_message_id)
@@ -192,8 +218,8 @@ async def finish_activity(guild):
     global activity_running, activity_message_id, activity_number
     global first_reactor, backup_before_strikes
 
-    channel = bot.get_channel(ACTIVITY_CHANNEL_ID)
-    strike_channel = bot.get_channel(STRIKE_CHANNEL_ID)
+    channel = bot.get_channel(1490395401935655043)
+    strike_channel = bot.get_channel(1490395402304749810)
 
     try:
         msg = await channel.fetch_message(activity_message_id)
@@ -261,7 +287,7 @@ async def finish_activity(guild):
 # ================= ANNOUNCE =================
 @bot.command()
 async def announce(ctx, *, message):
-    role = ctx.guild.get_role(ACTIVITY_ADMIN_ROLE)
+    role = ctx.guild.get_role(1490395401365356556)
 
     if role not in ctx.author.roles:
         return await ctx.send("❌ Keine Berechtigung!")
@@ -272,7 +298,7 @@ async def announce(ctx, *, message):
         if not member.bot:
             try:
                 embed = discord.Embed(
-                    title="📢 ANKÜNDIGUNG",
+                    title="📢ANKÜNDIGUNG📢",
                     description=message,
                     color=discord.Color.blue()
                 )
@@ -283,44 +309,5 @@ async def announce(ctx, *, message):
     await ctx.send("✅ Fertig!")
 
 
-# ================= SCHEDULE =================
-@bot.command()
-async def schedule(ctx, days: int, *, message):
-    global scheduled
-
-    time = datetime.now() + timedelta(days=days)
-
-    scheduled.append({
-        "time": time,
-        "guild": ctx.guild.id,
-        "message": message
-    })
-
-    await ctx.send(f"⏳ Geplant in {days} Tagen!")
-
-
-# ================= LOOP =================
-@tasks.loop(minutes=1)
-async def check_schedule():
-    now = datetime.now()
-
-    for item in scheduled[:]:
-        if now >= item["time"]:
-            guild = bot.get_guild(item["guild"])
-
-            if guild:
-                for member in guild.members:
-                    if not member.bot:
-                        try:
-                            await member.send(
-                                f"📢 GEPLANTE ANKÜNDIGUNG:\n{item['message']}"
-                            )
-                        except:
-                            pass
-
-            scheduled.remove(item)
-
-
-check_schedule.start()
-
+# ================= START BOT =================
 bot.run(TOKEN)
