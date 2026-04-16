@@ -259,22 +259,62 @@ async def finish_activity(guild):
 # ================= ANNOUNCE =================
 @bot.command()
 async def announce(ctx, *, message):
-    role = ctx.guild.get_role(ACTIVITY_ADMIN_ROLE)
+    role = ctx.guild.get_role(1490395401365356556)
 
     if role not in ctx.author.roles:
-        return await ctx.send("❌ Keine Berechtigung!")
+        await ctx.send("❌ Du hast keine Berechtigung für diesen Command!")
+        return
 
-    await ctx.message.delete()
+    await ctx.send("📨 Sende Nachricht an alle...")
 
-    embed = discord.Embed(
-        title="📢Annkündigung📢",
-        description=message,
-        color=discord.Color.blue()
-    )
+    for member in ctx.guild.members:
+        if not member.bot:
+            try:
+                embed = discord.Embed(
+                    title="📢 ANKÜNDIGUNG 📢",
+                    description=message,
+                    color=discord.Color.blue()
+                )
 
-    embed.set_footer(text=f"Von {ctx.author}", icon_url=ctx.author.avatar.url)
+                await member.send(embed=embed)
 
-    await ctx.send(embed=embed)
+            except:
+                pass
 
+    await ctx.send("✅ Fertig!")
+
+# ⏳ SCHEDULE
+@bot.command()
+async def schedule(ctx, days: int, *, message):
+    time = datetime.now() + timedelta(days=days)
+
+    scheduled.append({
+        "time": time,
+        "guild": ctx.guild.id,
+        "message": message
+    })
+
+    await ctx.send(f"⏳ Geplant in {days} Tagen!")
+
+# 🔁 CHECKER
+@tasks.loop(minutes=1)
+async def check_schedule():
+    now = datetime.now()
+
+    for item in scheduled[:]:
+        if now >= item["time"]:
+            guild = bot.get_guild(item["guild"])
+
+            if guild:
+                for member in guild.members:
+                    if not member.bot:
+                        try:
+                            await member.send(
+                                f"📢 GEPLANTE ANKÜNDIGUNG:\n{item['message']}"
+                            )
+                        except:
+                            pass
+
+            scheduled.remove(item)
 
 bot.run(TOKEN)
