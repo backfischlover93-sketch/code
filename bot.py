@@ -327,6 +327,8 @@ async def on_member_join(member):
 
     await channel.send(embed=embed)
 
+# ================= BAN =================
+
 import discord
 from discord.ext import commands
 
@@ -347,59 +349,65 @@ class AppealModal(discord.ui.Modal, title="Ban Einspruch"):
     explanation = discord.ui.TextInput(
         label="Einspruch Erklärung",
         style=discord.TextStyle.paragraph,
-        placeholder="Erkläre ausführlich warum du entbannt werden solltest...",
+        placeholder="Erkläre warum du entbannt werden solltest...",
         required=True,
         max_length=1000
     )
 
     async def on_submit(self, interaction: discord.Interaction):
 
-        text = self.explanation.value.lower()
+        try:
+            text = self.explanation.value.lower()
 
-        for word in blacklist_words:
-            if word in text:
+            # BAD WORD FILTER
+            for word in blacklist_words:
+                if word in text:
+                    return await interaction.response.send_message(
+                        "❌ Einspruch ungültig (Beleidigung erkannt)",
+                        ephemeral=True
+                    )
+
+            # MIN WÖRTER
+            if len(text.split()) < 15:
                 return await interaction.response.send_message(
-                    "❌ Einspruch ungültig! Beleidigungen sind verboten.",
+                    "❌ Mindestens 15 Wörter nötig!",
                     ephemeral=True
                 )
 
-        if len(text.split()) < 15:
-            return await interaction.response.send_message(
-                "❌ Einspruch ungültig! Mindestens 15 Wörter nötig.",
+            owner = interaction.client.get_user(BAN_OWNER_ID)
+            if owner is None:
+                owner = await interaction.client.fetch_user(BAN_OWNER_ID)
+
+            embed = discord.Embed(
+                title="📩 Neuer Ban Einspruch",
+                description=self.explanation.value,
+                color=discord.Color.blue()
+            )
+
+            embed.add_field(
+                name="User",
+                value=f"{interaction.user} ({interaction.user.id})",
+                inline=False
+            )
+
+            embed.set_thumbnail(url=interaction.user.display_avatar.url)
+
+            view = AppealAdminView()
+            view.set_user(interaction.user.id)
+
+            await owner.send(embed=embed, view=view)
+
+            await interaction.response.send_message(
+                "✅ Einspruch gesendet!",
                 ephemeral=True
             )
 
-        owner = await interaction.client.fetch_user(BAN_OWNER_ID)
-
-        embed = discord.Embed(
-            title="📩 Neuer Ban Einspruch",
-            color=discord.Color.blue()
-        )
-
-        embed.add_field(
-            name="User",
-            value=f"{interaction.user} ({interaction.user.id})",
-            inline=False
-        )
-
-        embed.add_field(
-            name="Einspruch",
-            value=self.explanation.value,
-            inline=False
-        )
-
-        embed.set_thumbnail(url=interaction.user.display_avatar.url)
-
-        view = AppealAdminView()
-
-        view.set_user(interaction.user.id)
-
-        await owner.send(embed=embed, view=view)
-
-        await interaction.response.send_message(
-            "✅ Einspruch gesendet.",
-            ephemeral=True
-        )
+        except Exception as e:
+            print("APPEAL ERROR:", e)
+            await interaction.response.send_message(
+                "❌ Fehler beim Einspruch!",
+                ephemeral=True
+            )
 
 
 # ================= USER BUTTON =================
@@ -410,7 +418,8 @@ class AppealView(discord.ui.View):
     @discord.ui.button(
         label="Einspruch",
         style=discord.ButtonStyle.blurple,
-        emoji="📩"
+        emoji="📩",
+        custom_id="appeal_button"
     )
     async def appeal_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_modal(AppealModal())
@@ -455,7 +464,10 @@ class AppealAdminView(discord.ui.View):
     @discord.ui.button(label="Verlängern", style=discord.ButtonStyle.gray)
     async def extend(self, interaction: discord.Interaction, button: discord.ui.Button):
 
-        await interaction.response.send_message("Schreibe z.B 30d oder perm", ephemeral=True)
+        await interaction.response.send_message(
+            "Schreibe z.B: 30d oder perm",
+            ephemeral=True
+        )
 
         def check(m):
             return m.author == interaction.user and isinstance(m.channel, discord.DMChannel)
@@ -548,9 +560,7 @@ async def bann(ctx, member: discord.Member, duration: str, *, reason="Kein Grund
 async def on_ready():
     print(f"Bot online: {bot.user}")
 
-    # WICHTIG: Buttons bleiben aktiv nach Restart
     bot.add_view(AppealView())
-
 
 # ================= START BOT =================
 bot.run(TOKEN)
