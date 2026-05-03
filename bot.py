@@ -322,7 +322,7 @@ async def on_member_join(member):
         color=discord.Color.blue()
     )
 
-    embed.set_image(url="HIER_BILD_LINK")
+    embed.set_image(url="https://cdn.discordapp.com/attachments/1106263110219735225/1500490057889349742/Screenshot_2026-04-19_165813.png?ex=69f89fc3&is=69f74e43&hm=8e630423e0eb295ac93770873b109b633b35c0e419d2fccb6dda337dfb885740&")
 
     await channel.send(embed=embed)
 
