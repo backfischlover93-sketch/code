@@ -327,9 +327,9 @@ async def on_member_join(member):
 
     await channel.send(embed=embed)
 
-# ================= BAN SYSTEM =================
+import discord
+from discord.ext import commands
 
-# DEINE USER ID HIER EINTRAGEN
 BAN_OWNER_ID = 725358263901880402
 
 blacklist_words = [
@@ -356,7 +356,6 @@ class AppealModal(discord.ui.Modal, title="Ban Einspruch"):
 
         text = self.explanation.value.lower()
 
-        # BLACKLIST WÖRTER
         for word in blacklist_words:
             if word in text:
                 return await interaction.response.send_message(
@@ -364,14 +363,13 @@ class AppealModal(discord.ui.Modal, title="Ban Einspruch"):
                     ephemeral=True
                 )
 
-        # MINDESTENS 15 WÖRTER
         if len(text.split()) < 15:
             return await interaction.response.send_message(
                 "❌ Einspruch ungültig! Mindestens 15 Wörter nötig.",
                 ephemeral=True
             )
 
-        owner = await bot.fetch_user(BAN_OWNER_ID)
+        owner = await interaction.client.fetch_user(BAN_OWNER_ID)
 
         embed = discord.Embed(
             title="📩 Neuer Ban Einspruch",
@@ -392,18 +390,19 @@ class AppealModal(discord.ui.Modal, title="Ban Einspruch"):
 
         embed.set_thumbnail(url=interaction.user.display_avatar.url)
 
-        view = AppealAdminView(interaction.user.id)
+        view = AppealAdminView()
 
-        # DM AN DICH
+        view.set_user(interaction.user.id)
+
         await owner.send(embed=embed, view=view)
 
         await interaction.response.send_message(
-            "✅ Einspruch erfolgreich gesendet.",
+            "✅ Einspruch gesendet.",
             ephemeral=True
         )
 
 
-# ================= APPEAL BUTTON =================
+# ================= USER BUTTON =================
 class AppealView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
@@ -417,181 +416,140 @@ class AppealView(discord.ui.View):
         await interaction.response.send_modal(AppealModal())
 
 
-# ================= ADMIN BUTTONS =================
+# ================= ADMIN VIEW =================
 class AppealAdminView(discord.ui.View):
-    def __init__(self, user_id):
+    def __init__(self):
         super().__init__(timeout=None)
+        self.user_id = None
+
+    def set_user(self, user_id):
         self.user_id = user_id
 
-    @discord.ui.button(
-        label="Annehmen",
-        style=discord.ButtonStyle.green
-    )
+    @discord.ui.button(label="Annehmen", style=discord.ButtonStyle.green)
     async def accept(self, interaction: discord.Interaction, button: discord.ui.Button):
 
-        guild = bot.guilds[0]
-
-        user = await bot.fetch_user(self.user_id)
+        guild = interaction.guild
+        user = await interaction.client.fetch_user(self.user_id)
 
         await guild.unban(user)
 
         try:
-            await user.send(
-                "✅ Dein Einspruch wurde angenommen. Du wurdest entbannt."
-            )
+            await user.send("✅ Dein Einspruch wurde angenommen. Du bist entbannt.")
         except:
             pass
 
-        await interaction.response.send_message(
-            f"✅ {user} wurde entbannt."
-        )
+        await interaction.response.send_message("✅ User entbannt.")
 
-    @discord.ui.button(
-        label="Ablehnen",
-        style=discord.ButtonStyle.red
-    )
+    @discord.ui.button(label="Ablehnen", style=discord.ButtonStyle.red)
     async def deny(self, interaction: discord.Interaction, button: discord.ui.Button):
 
-        user = await bot.fetch_user(self.user_id)
+        user = await interaction.client.fetch_user(self.user_id)
 
         try:
-            await user.send(
-                "❌ Dein Einspruch wurde abgelehnt."
-            )
+            await user.send("❌ Dein Einspruch wurde abgelehnt.")
         except:
             pass
 
-        await interaction.response.send_message(
-            "❌ Einspruch abgelehnt."
-        )
+        await interaction.response.send_message("❌ Abgelehnt.")
 
-    @discord.ui.button(
-        label="Verlängern",
-        style=discord.ButtonStyle.gray
-    )
+    @discord.ui.button(label="Verlängern", style=discord.ButtonStyle.gray)
     async def extend(self, interaction: discord.Interaction, button: discord.ui.Button):
 
-        await interaction.response.send_message(
-            "✍ Schreibe z.B: perm oder 30d",
-            ephemeral=True
-        )
+        await interaction.response.send_message("Schreibe z.B 30d oder perm", ephemeral=True)
 
         def check(m):
-            return (
-                m.author == interaction.user and
-                isinstance(m.channel, discord.DMChannel)
-            )
+            return m.author == interaction.user and isinstance(m.channel, discord.DMChannel)
 
-        msg = await bot.wait_for("message", check=check)
+        msg = await interaction.client.wait_for("message", check=check)
 
-        user = await bot.fetch_user(self.user_id)
+        user = await interaction.client.fetch_user(self.user_id)
 
         try:
-            await user.send(
-                f"⏳ Dein Bann wurde verlängert auf: {msg.content}"
-            )
+            await user.send(f"⏳ Bann geändert auf: {msg.content}")
         except:
             pass
 
-        await interaction.followup.send(
-            f"✅ Bann verlängert auf: {msg.content}"
-        )
+        await interaction.followup.send(f"✅ Geändert auf {msg.content}")
 
 
-# ================= BAN SYSTEM =================
+# ================= BAN COMMAND =================
 @bot.command()
 async def bann(ctx, member: discord.Member, duration: str, *, reason="Kein Grund angegeben"):
 
-    # NUR DIESE ROLLE DARF BANNEN
     allowed_role = ctx.guild.get_role(1490395401365356556)
 
     if allowed_role not in ctx.author.roles:
         return await ctx.send("❌ Keine Berechtigung!")
 
     try:
+
         embed = discord.Embed(
             title="🔨 Du wurdest gebannt",
             color=discord.Color.blue()
         )
 
-        # ================= PERMANENT =================
+        embed.set_thumbnail(url=member.display_avatar.url)
+
+        view = AppealView()
+
+        # ================= PERM =================
         if duration.lower() == "perm":
 
             embed.description = (
-                f"Du wurdest von Fanatico Bochum permanent gebannt.\n\n"
+                f"Du wurdest permanent gebannt.\n\n"
                 f"Grund: {reason}\n\n"
-                f"**Bei Fragen wende dich an Luca oder Backfisch.**"
+                f"Bei Fragen wende dich an Luca oder Backfisch."
             )
 
-            embed.set_thumbnail(url=member.display_avatar.url)
-
             try:
-                await member.send(
-                    embed=embed,
-                    view=AppealView()
-                )
+                await member.send(embed=embed, view=view)
             except:
                 pass
 
             await member.ban(reason=reason)
 
-            await ctx.send(
-                f"✅ {member.mention} wurde permanent gebannt.\n"
-                f"Grund: {reason}"
-            )
+            await ctx.send(f"✅ {member} permanent gebannt.")
 
-        # ================= TEMP BAN =================
+        # ================= TEMP =================
         else:
 
-            unit = duration[-1]
             amount = int(duration[:-1])
-
-            days = 0
-
-            if unit == "d":
-                days = amount
-
-            elif unit == "h":
-                days = amount / 24
-
-            else:
-                return await ctx.send(
-                    "❌ Nutze z.B 1d, 7d, 30d oder perm"
-                )
 
             tage_text = "Tag" if amount == 1 else "Tage"
 
             embed.description = (
-                f"Du wurdest von Fanatico Bochum gebannt.\n\n"
+                f"Du wurdest gebannt.\n\n"
                 f"Dauer: {amount} {tage_text}\n"
                 f"Grund: {reason}\n\n"
-                f"Du kannst in {amount} {tage_text} wieder auf den Server joinen.\n\n"
-                f"**Bei Fragen wende dich an Luca oder Backfisch.**"
+                f"Du kannst in {amount} {tage_text} wieder joinen.\n\n"
+                f"Bei Fragen wende dich an Luca oder Backfisch."
             )
 
-            embed.set_thumbnail(url=member.display_avatar.url)
-
             try:
-                await member.send(
-                    embed=embed,
-                    view=AppealView()
-                )
+                await member.send(embed=embed, view=view)
             except:
                 pass
 
             await member.ban(reason=reason)
 
-            await ctx.send(
-                f"✅ {member.mention} wurde für {amount} {tage_text} gebannt.\n"
-                f"Grund: {reason}"
-            )
+            await ctx.send(f"✅ {member} für {amount} {tage_text} gebannt.")
 
-            await asyncio.sleep(days * 86400)
+            await asyncio.sleep(amount * 86400)
 
-            await ctx.guild.unban(member)
+            user = await bot.fetch_user(member.id)
+            await ctx.guild.unban(user)
 
     except Exception as e:
         await ctx.send(f"❌ Fehler: {e}")
+
+
+# ================= IMPORTANT =================
+@bot.event
+async def on_ready():
+    print(f"Bot online: {bot.user}")
+
+    # WICHTIG: Buttons bleiben aktiv nach Restart
+    bot.add_view(AppealView())
 
 
 # ================= START BOT =================
