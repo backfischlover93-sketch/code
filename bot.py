@@ -308,6 +308,24 @@ async def announce(ctx, *, message):
 
     await ctx.send("✅ Fertig!")
 
+# ================= WELCOME =================
+@bot.event
+async def on_member_join(member):
+    channel = bot.get_channel(WELCOME_CHANNEL_ID)
+
+    if channel is None:
+        return
+
+    embed = discord.Embed(
+        title="👋 Herzlich Willkommen",
+        description=f"Herzlich Willkommen {member.mention} beim Fanatico Bochum",
+        color=discord.Color.blue()
+    )
+
+    embed.set_image(url="HIER_BILD_LINK")
+
+    await channel.send(embed=embed)
+
 
 # ================= START BOT =================
 bot.run(TOKEN)
