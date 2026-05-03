@@ -327,6 +327,93 @@ async def on_member_join(member):
 
     await channel.send(embed=embed)
 
+# ================= BAN SYSTEM =================
+@bot.command()
+async def bann(ctx, member: discord.Member, duration: str, *, reason="Kein Grund angegeben"):
+
+    # NUR DIESE ROLLE DARF BANNEN
+    allowed_role = ctx.guild.get_role(1490395401365356556)
+
+    if allowed_role not in ctx.author.roles:
+        return await ctx.send("❌ Keine Berechtigung!")
+
+    try:
+        embed = discord.Embed(
+            title="🔨 Du wurdest gebannt",
+            color=discord.Color.blue()
+        )
+
+        # ================= PERMANENT =================
+        if duration.lower() == "perm":
+
+            embed.description = (
+                f"Du wurdest von Fanatico Bochum permanent gebannt.\n\n"
+                f"Grund: {reason}\n\n"
+                f"Bei Fragen wende dich an Luca oder Backfisch."
+            )
+
+            embed.set_thumbnail(url=member.avatar.url)
+
+            try:
+                await member.send(embed=embed)
+            except:
+                pass
+
+            await member.ban(reason=reason)
+
+            await ctx.send(
+                f"✅ {member.mention} wurde permanent gebannt.\n"
+                f"Grund: {reason}"
+            )
+
+        # ================= TEMP BAN =================
+        else:
+
+            unit = duration[-1]
+            amount = int(duration[:-1])
+
+            days = 0
+
+            if unit == "d":
+                days = amount
+
+            elif unit == "h":
+                days = amount / 24
+
+            else:
+                return await ctx.send(
+                    "❌ Nutze z.B 1d, 7d, 30d oder perm"
+                )
+
+            embed.description = (
+                f"Du wurdest von Fanatico Bochum gebannt.\n\n"
+                f"Dauer: {duration}\n"
+                f"Grund: {reason}\n\n"
+                f"Du kannst in {duration} wieder auf den Server joinen.\n"
+                f"Bei Fragen wende dich an Luca oder Backfisch."
+            )
+
+            embed.set_thumbnail(url=member.avatar.url)
+
+            try:
+                await member.send(embed=embed)
+            except:
+                pass
+
+            await member.ban(reason=reason)
+
+            await ctx.send(
+                f"✅ {member.mention} wurde für {duration} gebannt.\n"
+                f"Grund: {reason}"
+            )
+
+            await asyncio.sleep(days * 86400)
+
+            await ctx.guild.unban(member)
+
+    except Exception as e:
+        await ctx.send(f"❌ Fehler: {e}")
+
 
 # ================= START BOT =================
 bot.run(TOKEN)
