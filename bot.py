@@ -311,7 +311,7 @@ async def announce(ctx, *, message):
 # ================= WELCOME =================
 @bot.event
 async def on_member_join(member):
-    channel = bot.get_channel(WELCOME_CHANNEL_ID)
+    channel = bot.get_channel(1490395401935655038)
 
     if channel is None:
         return
