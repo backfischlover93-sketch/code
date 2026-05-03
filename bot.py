@@ -352,7 +352,7 @@ async def bann(ctx, member: discord.Member, duration: str, *, reason="Kein Grund
                 f"Bei Fragen wende dich an Luca oder Backfisch."
             )
 
-            embed.set_thumbnail(url=member.avatar.url)
+            embed.set_thumbnail(url=member.display_avatar.url)
 
             try:
                 await member.send(embed=embed)
@@ -393,7 +393,7 @@ async def bann(ctx, member: discord.Member, duration: str, *, reason="Kein Grund
                 f"Bei Fragen wende dich an Luca oder Backfisch."
             )
 
-            embed.set_thumbnail(url=member.avatar.url)
+            embed.set_thumbnail(url=member.display_avatar.url)
 
             try:
                 await member.send(embed=embed)
