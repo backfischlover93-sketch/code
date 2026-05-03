@@ -349,7 +349,6 @@ class AppealModal(discord.ui.Modal, title="Ban Einspruch"):
     explanation = discord.ui.TextInput(
         label="Einspruch Erklärung",
         style=discord.TextStyle.paragraph,
-        placeholder="Erkläre warum du entbannt werden solltest...",
         required=True,
         max_length=1000
     )
@@ -359,7 +358,7 @@ class AppealModal(discord.ui.Modal, title="Ban Einspruch"):
         try:
             text = self.explanation.value.lower()
 
-            # BAD WORD FILTER
+            # FILTER
             for word in blacklist_words:
                 if word in text:
                     return await interaction.response.send_message(
@@ -367,12 +366,14 @@ class AppealModal(discord.ui.Modal, title="Ban Einspruch"):
                         ephemeral=True
                     )
 
-            # MIN WÖRTER
             if len(text.split()) < 15:
                 return await interaction.response.send_message(
                     "❌ Mindestens 15 Wörter nötig!",
                     ephemeral=True
                 )
+
+            # WICHTIG: sofort ACK (verhindert „Interaktion fehlgeschlagen“)
+            await interaction.response.defer(ephemeral=True)
 
             owner = interaction.client.get_user(BAN_OWNER_ID)
             if owner is None:
@@ -395,19 +396,19 @@ class AppealModal(discord.ui.Modal, title="Ban Einspruch"):
             view = AppealAdminView()
             view.set_user(interaction.user.id)
 
-            await owner.send(embed=embed, view=view)
+            try:
+                await owner.send(embed=embed, view=view)
+            except Exception as e:
+                print("DM ERROR OWNER:", e)
 
-            await interaction.response.send_message(
-                "✅ Einspruch gesendet!",
-                ephemeral=True
-            )
+            await interaction.followup.send("✅ Einspruch gesendet!")
 
         except Exception as e:
             print("APPEAL ERROR:", e)
-            await interaction.response.send_message(
-                "❌ Fehler beim Einspruch!",
-                ephemeral=True
-            )
+            try:
+                await interaction.followup.send("❌ Fehler beim Einspruch!")
+            except:
+                pass
 
 
 # ================= USER BUTTON =================
@@ -526,7 +527,6 @@ async def bann(ctx, member: discord.Member, duration: str, *, reason="Kein Grund
         else:
 
             amount = int(duration[:-1])
-
             tage_text = "Tag" if amount == 1 else "Tage"
 
             embed.description = (
