@@ -328,6 +328,177 @@ async def on_member_join(member):
     await channel.send(embed=embed)
 
 # ================= BAN SYSTEM =================
+
+# DEINE USER ID HIER EINTRAGEN
+BAN_OWNER_ID = 123456789123456789
+
+blacklist_words = [
+    "hurensohn",
+    "fotze",
+    "hure",
+    "wichser",
+    "fick"
+]
+
+
+# ================= APPEAL MODAL =================
+class AppealModal(discord.ui.Modal, title="Ban Einspruch"):
+
+    explanation = discord.ui.TextInput(
+        label="Einspruch Erklärung",
+        style=discord.TextStyle.paragraph,
+        placeholder="Erkläre ausführlich warum du entbannt werden solltest...",
+        required=True,
+        max_length=1000
+    )
+
+    async def on_submit(self, interaction: discord.Interaction):
+
+        text = self.explanation.value.lower()
+
+        # BLACKLIST WÖRTER
+        for word in blacklist_words:
+            if word in text:
+                return await interaction.response.send_message(
+                    "❌ Einspruch ungültig! Beleidigungen sind verboten.",
+                    ephemeral=True
+                )
+
+        # MINDESTENS 15 WÖRTER
+        if len(text.split()) < 15:
+            return await interaction.response.send_message(
+                "❌ Einspruch ungültig! Mindestens 15 Wörter nötig.",
+                ephemeral=True
+            )
+
+        owner = await bot.fetch_user(BAN_OWNER_ID)
+
+        embed = discord.Embed(
+            title="📩 Neuer Ban Einspruch",
+            color=discord.Color.blue()
+        )
+
+        embed.add_field(
+            name="User",
+            value=f"{interaction.user} ({interaction.user.id})",
+            inline=False
+        )
+
+        embed.add_field(
+            name="Einspruch",
+            value=self.explanation.value,
+            inline=False
+        )
+
+        embed.set_thumbnail(url=interaction.user.display_avatar.url)
+
+        view = AppealAdminView(interaction.user.id)
+
+        # DM AN DICH
+        await owner.send(embed=embed, view=view)
+
+        await interaction.response.send_message(
+            "✅ Einspruch erfolgreich gesendet.",
+            ephemeral=True
+        )
+
+
+# ================= APPEAL BUTTON =================
+class AppealView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.button(
+        label="Einspruch",
+        style=discord.ButtonStyle.blurple,
+        emoji="📩"
+    )
+    async def appeal_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_modal(AppealModal())
+
+
+# ================= ADMIN BUTTONS =================
+class AppealAdminView(discord.ui.View):
+    def __init__(self, user_id):
+        super().__init__(timeout=None)
+        self.user_id = user_id
+
+    @discord.ui.button(
+        label="Annehmen",
+        style=discord.ButtonStyle.green
+    )
+    async def accept(self, interaction: discord.Interaction, button: discord.ui.Button):
+
+        guild = bot.guilds[0]
+
+        user = await bot.fetch_user(self.user_id)
+
+        await guild.unban(user)
+
+        try:
+            await user.send(
+                "✅ Dein Einspruch wurde angenommen. Du wurdest entbannt."
+            )
+        except:
+            pass
+
+        await interaction.response.send_message(
+            f"✅ {user} wurde entbannt."
+        )
+
+    @discord.ui.button(
+        label="Ablehnen",
+        style=discord.ButtonStyle.red
+    )
+    async def deny(self, interaction: discord.Interaction, button: discord.ui.Button):
+
+        user = await bot.fetch_user(self.user_id)
+
+        try:
+            await user.send(
+                "❌ Dein Einspruch wurde abgelehnt."
+            )
+        except:
+            pass
+
+        await interaction.response.send_message(
+            "❌ Einspruch abgelehnt."
+        )
+
+    @discord.ui.button(
+        label="Verlängern",
+        style=discord.ButtonStyle.gray
+    )
+    async def extend(self, interaction: discord.Interaction, button: discord.ui.Button):
+
+        await interaction.response.send_message(
+            "✍ Schreibe z.B: perm oder 30d",
+            ephemeral=True
+        )
+
+        def check(m):
+            return (
+                m.author == interaction.user and
+                isinstance(m.channel, discord.DMChannel)
+            )
+
+        msg = await bot.wait_for("message", check=check)
+
+        user = await bot.fetch_user(self.user_id)
+
+        try:
+            await user.send(
+                f"⏳ Dein Bann wurde verlängert auf: {msg.content}"
+            )
+        except:
+            pass
+
+        await interaction.followup.send(
+            f"✅ Bann verlängert auf: {msg.content}"
+        )
+
+
+# ================= BAN SYSTEM =================
 @bot.command()
 async def bann(ctx, member: discord.Member, duration: str, *, reason="Kein Grund angegeben"):
 
@@ -349,13 +520,16 @@ async def bann(ctx, member: discord.Member, duration: str, *, reason="Kein Grund
             embed.description = (
                 f"Du wurdest von Fanatico Bochum permanent gebannt.\n\n"
                 f"Grund: {reason}\n\n"
-                f"Bei Fragen wende dich an Luca oder Backfisch."
+                f"**Bei Fragen wende dich an Luca oder Backfisch.**"
             )
 
             embed.set_thumbnail(url=member.display_avatar.url)
 
             try:
-                await member.send(embed=embed)
+                await member.send(
+                    embed=embed,
+                    view=AppealView()
+                )
             except:
                 pass
 
@@ -385,25 +559,30 @@ async def bann(ctx, member: discord.Member, duration: str, *, reason="Kein Grund
                     "❌ Nutze z.B 1d, 7d, 30d oder perm"
                 )
 
+            tage_text = "Tag" if amount == 1 else "Tage"
+
             embed.description = (
                 f"Du wurdest von Fanatico Bochum gebannt.\n\n"
-                f"Dauer: {duration}\n"
+                f"Dauer: {amount} {tage_text}\n"
                 f"Grund: {reason}\n\n"
-                f"Du kannst in {duration} wieder auf den Server joinen.\n"
-                f"Bei Fragen wende dich an Luca oder Backfisch."
+                f"Du kannst in {amount} {tage_text} wieder auf den Server joinen.\n\n"
+                f"**Bei Fragen wende dich an Luca oder Backfisch.**"
             )
 
             embed.set_thumbnail(url=member.display_avatar.url)
 
             try:
-                await member.send(embed=embed)
+                await member.send(
+                    embed=embed,
+                    view=AppealView()
+                )
             except:
                 pass
 
             await member.ban(reason=reason)
 
             await ctx.send(
-                f"✅ {member.mention} wurde für {duration} gebannt.\n"
+                f"✅ {member.mention} wurde für {amount} {tage_text} gebannt.\n"
                 f"Grund: {reason}"
             )
 
