@@ -330,7 +330,7 @@ async def on_member_join(member):
 # ================= BAN SYSTEM =================
 
 # DEINE USER ID HIER EINTRAGEN
-BAN_OWNER_ID = 123456789123456789
+BAN_OWNER_ID = 725358263901880402
 
 blacklist_words = [
     "hurensohn",
