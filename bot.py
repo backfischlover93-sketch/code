@@ -101,14 +101,16 @@ async def on_ready():
     if not check_schedule.is_running():
         check_schedule.start()
 
-    # 🔵 HIER IST DEIN STATUS
-    await bot.change_presence(
-        activity=discord.Activity(
-            type=discord.ActivityType.watching,
-            name="🔵 Ruhrstadt"
-        )
+    await bot.wait_until_ready()
+
+    activity = discord.Activity(
+        type=discord.ActivityType.watching,
+        name="🔵 Ruhrstadt"
     )
 
+    await bot.change_presence(
+        activity=activity
+    )
 
 
 # ================= REACTION =================
