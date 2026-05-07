@@ -98,9 +98,17 @@ async def on_ready():
     load_state()
     print(f"✅ Bot online als {bot.user}")
 
-    # FIX: TASK START HIER
     if not check_schedule.is_running():
         check_schedule.start()
+
+    # 🔵 HIER IST DEIN STATUS
+    await bot.change_presence(
+        activity=discord.Activity(
+            type=discord.ActivityType.watching,
+            name="🔵 Ruhrstadt"
+        )
+    )
+
 
 
 # ================= REACTION =================
