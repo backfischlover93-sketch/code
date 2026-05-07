@@ -105,7 +105,7 @@ async def on_ready():
         check_schedule.start()
 
     await bot.change_presence(
-        activity=discord.Game(name="🔵 Ruhrstadt")
+        activity=discord.Game(name="🔵Ruhrstadt⚪")
     )
 
 
@@ -630,7 +630,7 @@ async def on_ready():
         check_schedule.start()
 
     await bot.change_presence(
-        activity=discord.Game(name="🔵 Ruhrstadt")
+        activity=discord.Game(name="🔵Ruhrstadt⚪")
     )
 
 # ================= START BOT =================
