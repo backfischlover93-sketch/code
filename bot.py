@@ -96,20 +96,16 @@ async def check_schedule():
 @bot.event
 async def on_ready():
     load_state()
+
     print(f"✅ Bot online als {bot.user}")
+
+    bot.add_view(AppealView())
 
     if not check_schedule.is_running():
         check_schedule.start()
 
-    await bot.wait_until_ready()
-
-    activity = discord.Activity(
-        type=discord.ActivityType.watching,
-        name="🔵 Ruhrstadt"
-    )
-
     await bot.change_presence(
-        activity=activity
+        activity=discord.Game(name="🔵 Ruhrstadt")
     )
 
 
@@ -624,9 +620,18 @@ async def bann(ctx, member: discord.Member, duration: str, *, reason="Kein Grund
 # ================= IMPORTANT =================
 @bot.event
 async def on_ready():
-    print(f"Bot online: {bot.user}")
+    load_state()
+
+    print(f"✅ Bot online als {bot.user}")
 
     bot.add_view(AppealView())
+
+    if not check_schedule.is_running():
+        check_schedule.start()
+
+    await bot.change_presence(
+        activity=discord.Game(name="🔵 Ruhrstadt")
+    )
 
 # ================= START BOT =================
 bot.run(TOKEN)
