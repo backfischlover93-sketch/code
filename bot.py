@@ -180,9 +180,61 @@ async def abbruch(ctx):
 
 
 # ================= END =================
+
+import json
+
+used_activity_ids = {
+    1501223693345620089,
+    1500425476009889863,
+    1499739823592837362,
+    1498693215073730583,
+    1497666708587151431,
+    1496535300883611670,
+    1495792869531848947,
+    1495061932913201212,
+    1494049528381177886,
+    1493602959731326996,
+    1492971321598935280,
+    1492122957894389843,
+    1491407539911528488,
+    1490776002253684767
+}
+
+
+activity_message_id = None
+activity_running = False
+
+
+def save_state():
+    data = {
+        "activity_message_id": activity_message_id,
+        "activity_running": activity_running,
+        "used_activity_ids": list(used_activity_ids)
+    }
+
+    with open("state.json", "w") as f:
+        json.dump(data, f)
+
+
+def load_state():
+    global activity_message_id, activity_running, used_activity_ids
+
+    try:
+        with open("state.json", "r") as f:
+            data = json.load(f)
+
+            activity_message_id = data.get("activity_message_id")
+            activity_running = data.get("activity_running", False)
+
+            used_activity_ids = set(data.get("used_activity_ids", []))
+
+    except:
+        used_activity_ids = set()
+
+
 @bot.command()
 async def end(ctx, message_id: int = None):
-    global activity_message_id, activity_running
+    global activity_message_id, activity_running, used_activity_ids
 
     role = ctx.guild.get_role(1490395401365356556)
 
@@ -195,6 +247,9 @@ async def end(ctx, message_id: int = None):
     if not activity_message_id:
         return await ctx.send("❌ Keine Message ID!")
 
+    if activity_message_id in used_activity_ids:
+        return await ctx.send("❌ Diese Activity wurde bereits beendet! Verwende die aktuelle Nachrichten ID!")
+
     channel = bot.get_channel(1490395401935655043)
 
     try:
@@ -206,13 +261,14 @@ async def end(ctx, message_id: int = None):
 
     await finish_activity(ctx.guild)
 
+    used_activity_ids.add(activity_message_id)
+
     activity_running = False
     activity_message_id = None
 
     save_state()
 
     await ctx.send("✅ Fertig!")
-
 
 # ================= FINISH =================
 async def finish_activity(guild):
